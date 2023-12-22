@@ -7,6 +7,14 @@ use ratatui::{
     prelude::{CrosstermBackend, Stylize, Terminal},
     widgets::Paragraph,
 };
+use serde_json;
+use std::error::Error;
+use std::fs::OpenOptions;
+use std::path::Path;
+
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::io::{self, Write};
 use std::io::{stdout, Result};
 use std::path::PathBuf;
 
@@ -42,9 +50,11 @@ enum PrioritizeActions {
         #[arg(short, long)]
         priority: Option<u32>,
     },
+
+    List {},
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 struct List {
     todos: Vec<ListItem>,
 }
@@ -55,7 +65,7 @@ impl List {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 struct ListItem {
     task: String,
     priority: Option<u32>,
@@ -64,20 +74,32 @@ struct ListItem {
 fn main() -> Result<()> {
     let cli = Cli::parse();
     let mut main_list = List::new();
+    // Load existing items from the file
+    let path = Path::new("todos.json");
+    if path.exists() {
+        let file = fs::File::open(path)?;
+        main_list = serde_json::from_reader(file)?;
+    }
 
     // matches just as you would the top level cmd
     match &cli.command {
         Some(Commands::Prioritize { action }) => match action {
             PrioritizeActions::Add { task, priority } => {
-                dbg!(&priority);
                 // todo!();
                 // let priority = Some(priority);
                 main_list.todos.push(ListItem {
                     task: task.clone(),
                     priority: *priority,
                 });
+
+                // Serialize the updated list and write it to the file
+                let json = serde_json::to_string_pretty(&main_list)?;
+                fs::write("todos.json", json)?;
                 // println!("Adding task: '{}' with priority: {}", task, priority);
                 dbg!(main_list);
+            }
+            PrioritizeActions::List {} => {
+                dbg!(&main_list);
             }
         },
         // start the UI when no commands are passed
