@@ -50,30 +50,32 @@ impl Log {
 
         Ok(())
     }
+
+    pub fn formatted_ordered_items(self) -> String {
+        let today = Local::now().date_naive();
+        let mut ordered_list = String::new();
+        if let Some(plist) = self.days.get(&today) {
+            for (index, uuid) in plist.order.iter().enumerate() {
+                if let Some(entry) = plist.todos.get(uuid) {
+                    let priority_str = entry.priority.map_or("".to_string(), |p| p.to_string());
+                    ordered_list.push_str(&format!(
+                        "i {}, Task: {}, Priority: {}\n",
+                        index, entry.task, priority_str
+                    ));
+                }
+            }
+        } else {
+            println!("no entries for today")
+            // Handle the case where there is no entry for today's date
+        }
+
+        ordered_list
+    }
 }
-
-// impl Day {
-//     pub fn new(date: NaiveDate) -> Self {
-//         Self {
-//             date,
-//             list: List::new(),
-//         }
-//     }
-//
-//     pub fn add_item(&mut self, task: String, priority: Option<u32>) {
-//         let _ = self.list.add_item(task, priority);
-//     }
-// }
-
-// #[derive(Debug, Serialize, Deserialize)]
-// pub struct Day {
-//     pub date: NaiveDate,
-//     pub list: List,
-// }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct List {
-    pub todos: Vec<ListItem>,
+    pub todos: HashMap<Uuid, ListItem>,
     order: Vec<Uuid>,
 }
 
@@ -81,7 +83,6 @@ pub struct List {
 pub struct ListItem {
     // #[serde(with = "uuid::serde")]
     // #[serde(with = "uuid::serde")]
-    id: Uuid,
     pub task: String,
     pub priority: Option<u32>,
 }
@@ -89,18 +90,16 @@ pub struct ListItem {
 impl List {
     pub fn new() -> Self {
         Self {
-            todos: Vec::new(),
+            todos: HashMap::new(),
             order: Vec::new(),
         }
     }
 
     pub fn add_item(&mut self, task: String, priority: Option<u32>) -> Result<()> {
-        let new_item = ListItem {
-            id: Uuid::new_v4(), // Generate a unique ID
-            task,
-            priority,
-        };
-        self.todos.push(new_item); // Add item to todos list
+        let new_item = ListItem { task, priority };
+        let id = Uuid::new_v4();
+        let _ = self.todos.insert(id, new_item);
+        self.order.push(id);
         Ok(())
     }
 }

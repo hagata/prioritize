@@ -47,6 +47,7 @@ enum PrioritizeActions {
         priority: Option<u32>,
     },
 
+    #[command(alias = "ls")]
     List {},
 }
 
@@ -71,17 +72,8 @@ fn main() -> Result<()> {
                 dbg!(&main_list);
             }
             PrioritizeActions::List {} => {
-                let today = Local::now().date_naive();
-                if let Some(plist) = main_list.days.get(&today) {
-                    for entry in &plist.todos {
-                        //     let Some(String::priority) = entry.priority else {
-                        //         ""                    }
-                        println!("{:?} {:?}", entry.priority, entry.task);
-                    }
-                } else {
-                    println!("no entries for today")
-                    // Handle the case where there is no entry for today's date
-                }
+                let ordered_list = main_list.formatted_ordered_items();
+                print!("{}", ordered_list);
             }
         },
         // start the UI when no commands are passed
