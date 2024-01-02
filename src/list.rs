@@ -1,6 +1,7 @@
 use chrono::{Local, NaiveDate};
 use color_eyre::Result;
 
+use color_eyre::eyre::Ok;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -51,16 +52,46 @@ impl Log {
         Ok(())
     }
 
-    pub fn formatted_ordered_items(self) -> String {
+    pub fn mark_done(&mut self, index: usize) -> Result<()> {
         let today = Local::now().date_naive();
+
+        if let Some(list) = self.days.get_mut(&today) {
+            if let Some(&id) = list.order.get(index) {
+                if let Some(task) = list.todos.get_mut(&id) {
+                    task.done = true;
+                    let json = serde_json::to_string_pretty(&self.days)?;
+                    fs::write("todos.json", json)?;
+                } else {
+                    print!("Unable to locate task to complete");
+                }
+            } else {
+                print!("uuid not found")
+            }
+        } else {
+            println!("no entries for today")
+            // Handle the case where there is no entry for today's date
+        }
+        Ok(())
+    }
+
+    pub fn formatted_ordered_items(self, pred: u32) -> String {
+        let today = Local::now().date_naive();
+        print!("pred? {:?}", pred);
         let mut ordered_list = String::new();
         if let Some(plist) = self.days.get(&today) {
             for (index, uuid) in plist.order.iter().enumerate() {
                 if let Some(entry) = plist.todos.get(uuid) {
                     let priority_str = entry.priority.map_or("".to_string(), |p| p.to_string());
                     ordered_list.push_str(&format!(
-                        "i {}, Task: {}, Priority: {}\n",
-                        index, entry.task, priority_str
+                        "{}-[{}] {}, {}\n",
+                        index,
+                        if entry.done { "x" } else { " " },
+                        entry.task,
+                        if !priority_str.is_empty() {
+                            format!("P{}", priority_str)
+                        } else {
+                            "".to_string()
+                        }
                     ));
                 }
             }
@@ -85,6 +116,7 @@ pub struct ListItem {
     // #[serde(with = "uuid::serde")]
     pub task: String,
     pub priority: Option<u32>,
+    pub done: bool,
 }
 
 impl List {
@@ -96,7 +128,11 @@ impl List {
     }
 
     pub fn add_item(&mut self, task: String, priority: Option<u32>) -> Result<()> {
-        let new_item = ListItem { task, priority };
+        let new_item = ListItem {
+            task,
+            priority,
+            done: false,
+        };
         let id = Uuid::new_v4();
         let _ = self.todos.insert(id, new_item);
         self.order.push(id);

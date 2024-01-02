@@ -1,9 +1,7 @@
-use chrono::Local;
 use color_eyre::Result;
 use serde_json;
 use std::path::Path;
 
-// use serde::{Deserialize, Serialize};
 use std::fs;
 
 use clap::{Parser, Subcommand};
@@ -19,7 +17,6 @@ mod ui;
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
-    /// Turn debugging information on
     // #[arg(short, long, action = clap::ArgAction::Count)]
     // debug: u8,
     //
@@ -47,8 +44,16 @@ enum PrioritizeActions {
         priority: Option<u32>,
     },
 
+    Done {
+        #[arg(required = true)]
+        index: String,
+    },
+
     #[command(alias = "ls")]
-    List {},
+    List {
+        #[arg(short, long)]
+        pred: Option<u32>,
+    },
 }
 
 fn main() -> Result<()> {
@@ -68,12 +73,20 @@ fn main() -> Result<()> {
                 // todo!();
                 // let priority = Some(priority);
                 let _ = main_list.add_item_to_current_day(task.clone(), *priority);
-                // Serialize the updated list and write it to the file
-                dbg!(&main_list);
-            }
-            PrioritizeActions::List {} => {
-                let ordered_list = main_list.formatted_ordered_items();
+                // print the updated list
+                let ordered_list = main_list.formatted_ordered_items(0u32);
                 print!("{}", ordered_list);
+            }
+
+            PrioritizeActions::Done { index } => {
+                let _ = main_list.mark_done(index.parse::<usize>().unwrap());
+                let ordered_list = main_list.formatted_ordered_items(0);
+                print!("\n\n{}\n", ordered_list);
+            }
+            PrioritizeActions::List { pred } => {
+                let pred = pred.unwrap_or(0u32);
+                let ordered_list = main_list.formatted_ordered_items(pred);
+                print!("\n\n{}\n", ordered_list);
             }
         },
         // start the UI when no commands are passed
