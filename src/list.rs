@@ -52,13 +52,13 @@ impl Log {
         Ok(())
     }
 
-    pub fn mark_done(&mut self, index: usize) -> Result<()> {
+    pub fn toggle_done(&mut self, index: usize) -> Result<()> {
         let today = Local::now().date_naive();
 
         if let Some(list) = self.days.get_mut(&today) {
             if let Some(&id) = list.order.get(index) {
                 if let Some(task) = list.todos.get_mut(&id) {
-                    task.done = true;
+                    task.done = !task.done;
                     let json = serde_json::to_string_pretty(&self.days)?;
                     fs::write("todos.json", json)?;
                 } else {
@@ -75,10 +75,16 @@ impl Log {
     }
 
     pub fn formatted_ordered_items(self, pred: u32) -> String {
-        let today = Local::now().date_naive();
+        let mut day = Local::now().date_naive();
         print!("pred? {:?}", pred);
+
+        if pred != 0 {
+            day = self.get_prev_day(pred);
+            print!("\nList from, {:?}\n", day);
+        }
         let mut ordered_list = String::new();
-        if let Some(plist) = self.days.get(&today) {
+
+        if let Some(plist) = self.days.get(&day) {
             for (index, uuid) in plist.order.iter().enumerate() {
                 if let Some(entry) = plist.todos.get(uuid) {
                     let priority_str = entry.priority.map_or("".to_string(), |p| p.to_string());
@@ -96,11 +102,78 @@ impl Log {
                 }
             }
         } else {
-            println!("no entries for today")
+            println!("no entries for the day")
             // Handle the case where there is no entry for today's date
         }
 
         ordered_list
+    }
+
+    // move incomplete tasks from the prev_day to todays list.
+    pub fn carry_over_prev(&mut self, pred: u32) -> Result<()> {
+        let today = Local::now().date_naive();
+        let prev_day = self.get_prev_day(pred);
+        print!("today {:?}, prev {:?}", today, prev_day);
+
+        if let Some(prev_list) = self.days.get(&prev_day) {
+            let incomplete_tasks: HashMap<Uuid, ListItem> = prev_list
+                .todos
+                .iter()
+                .filter(|(_uuid, item)| !item.done)
+                .map(|(&uuid, item)| (uuid, item.clone())) // Clone each item and create a tuple
+                .collect();
+
+            dbg!(&incomplete_tasks);
+
+            // Append to today's entry or create a new entry with the completed tasks
+            self.days
+                .entry(today)
+                .or_insert_with(|| List::new())
+                .todos
+                .extend(incomplete_tasks.clone());
+
+            print!(
+                "\n Carried over {} task{}\n",
+                incomplete_tasks.len(),
+                if incomplete_tasks.len() > 1 { "s" } else { "" }
+            );
+
+            // append the order to the end of the current list
+            let ordering: Vec<Uuid> = incomplete_tasks.keys().cloned().collect();
+
+            self.days
+                .entry(today)
+                .or_insert_with(List::new)
+                .order
+                .extend(ordering);
+
+            let json = serde_json::to_string_pretty(&self.days)?;
+            fs::write("todos.json", json)?;
+        } else {
+            println!("Error finding prev list and carrying over tasks");
+        }
+        Ok(())
+    }
+
+    // Get the last entry before _today_, generally "yesterday", but
+    // will search back to the last date with an entry
+    fn get_prev_day(&self, pred: u32) -> NaiveDate {
+        let mut day = Local::now().date_naive();
+
+        for _i in 0..pred {
+            day = day.pred_opt().unwrap();
+            println!("loop {_i} of {pred}");
+            let mut last_list = false;
+            while !last_list {
+                if let Some(_) = self.days.get(&day) {
+                    last_list = true;
+                } else {
+                    day = day.pred_opt().unwrap();
+                }
+            }
+        }
+
+        day
     }
 }
 
@@ -110,7 +183,7 @@ pub struct List {
     order: Vec<Uuid>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListItem {
     // #[serde(with = "uuid::serde")]
     // #[serde(with = "uuid::serde")]

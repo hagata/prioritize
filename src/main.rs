@@ -51,7 +51,21 @@ enum PrioritizeActions {
 
     #[command(alias = "ls")]
     List {
-        #[arg(short, long)]
+        #[arg(
+            short,
+            long,
+            help = "previous n of days-ago to list. Will show the last day with tasks"
+        )]
+        pred: Option<u32>,
+    },
+
+    #[command(about = "carry over incomplete tasks from the previous day to todays list")]
+    Carry {
+        #[arg(
+            short,
+            long,
+            help = "previous n of days-ago to carry over incomplete tasks from. skips empty/missing days."
+        )]
         pred: Option<u32>,
     },
 }
@@ -75,17 +89,25 @@ fn main() -> Result<()> {
                 let _ = main_list.add_item_to_current_day(task.clone(), *priority);
                 // print the updated list
                 let ordered_list = main_list.formatted_ordered_items(0u32);
-                print!("{}", ordered_list);
+                print!("\n\n{}\n", ordered_list);
             }
 
             PrioritizeActions::Done { index } => {
-                let _ = main_list.mark_done(index.parse::<usize>().unwrap());
+                let _ = main_list.toggle_done(index.parse::<usize>().unwrap());
                 let ordered_list = main_list.formatted_ordered_items(0);
                 print!("\n\n{}\n", ordered_list);
             }
             PrioritizeActions::List { pred } => {
                 let pred = pred.unwrap_or(0u32);
                 let ordered_list = main_list.formatted_ordered_items(pred);
+                print!("\n\n{}\n", ordered_list);
+            }
+
+            PrioritizeActions::Carry { pred } => {
+                println!("Moving previous days incomplete items to today...");
+                let pred = pred.unwrap_or(1u32);
+                let _ = main_list.carry_over_prev(pred);
+                let ordered_list = main_list.formatted_ordered_items(0);
                 print!("\n\n{}\n", ordered_list);
             }
         },
