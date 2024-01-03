@@ -74,9 +74,8 @@ impl Log {
         Ok(())
     }
 
-    pub fn formatted_ordered_items(self, pred: u32) -> String {
+    pub fn formatted_ordered_items(self, pred: u32, incomplete_only: bool) -> String {
         let mut day = Local::now().date_naive();
-        print!("pred? {:?}", pred);
 
         if pred != 0 {
             day = self.get_prev_day(pred);
@@ -88,17 +87,20 @@ impl Log {
             for (index, uuid) in plist.order.iter().enumerate() {
                 if let Some(entry) = plist.todos.get(uuid) {
                     let priority_str = entry.priority.map_or("".to_string(), |p| p.to_string());
-                    ordered_list.push_str(&format!(
-                        "{}-[{}] {}, {}\n",
-                        index,
-                        if entry.done { "x" } else { " " },
-                        entry.task,
-                        if !priority_str.is_empty() {
-                            format!("P{}", priority_str)
-                        } else {
-                            "".to_string()
-                        }
-                    ));
+
+                    if !incomplete_only || incomplete_only && !entry.done {
+                        ordered_list.push_str(&format!(
+                            "{}-[{}] {}, {}\n",
+                            index,
+                            if entry.done { "x" } else { " " },
+                            entry.task,
+                            if !priority_str.is_empty() {
+                                format!("P{}", priority_str)
+                            } else {
+                                "".to_string()
+                            }
+                        ));
+                    }
                 }
             }
         } else {
@@ -162,7 +164,6 @@ impl Log {
 
         for _i in 0..pred {
             day = day.pred_opt().unwrap();
-            println!("loop {_i} of {pred}");
             let mut last_list = false;
             while !last_list {
                 if let Some(_) = self.days.get(&day) {
