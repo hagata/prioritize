@@ -1,8 +1,9 @@
 use color_eyre::Result;
 use serde_json;
-use std::path::Path;
-
 use std::fs;
+use std::path::Path;
+#[cfg(debug_assertions)]
+use std::time::Instant;
 
 use clap::{Parser, Subcommand};
 
@@ -44,6 +45,13 @@ enum PrioritizeActions {
         priority: Option<u32>,
     },
 
+    #[command(about = "Remove a task completely from the list")]
+    Remove {
+        #[arg(required = true)]
+        index: String,
+    },
+
+    #[command(about = "Mark a task as done")]
     Done {
         #[arg(required = true)]
         index: String,
@@ -76,12 +84,16 @@ enum PrioritizeActions {
 fn main() -> Result<()> {
     let cli = Cli::parse();
     let mut main_list = Log::new();
+    #[cfg(debug_assertions)]
+    let start = Instant::now();
     // Load existing items from the file
     let path = Path::new("todos.json");
     if path.exists() {
         let file = fs::File::open(path)?;
         main_list.days = serde_json::from_reader(file)?;
     }
+    #[cfg(debug_assertions)]
+    println!("Loading todos took {:?}", start.elapsed());
 
     // matches just as you would the top level cmd
     match &cli.command {
@@ -92,18 +104,29 @@ fn main() -> Result<()> {
                 let _ = main_list.add_item_to_current_day(task.clone(), *priority);
                 // print the updated list
                 let ordered_list = main_list.formatted_ordered_items(0u32, false);
-                print!("\n\n{}\n", ordered_list);
+                println!("\n\n{}\n", ordered_list);
             }
 
+            PrioritizeActions::Remove { index } => {
+                let _ = main_list.remove(index.parse::<usize>().unwrap());
+                let ordered_list = main_list.formatted_ordered_items(0, false);
+                print!("\n\n{}\n", ordered_list);
+            }
             PrioritizeActions::Done { index } => {
                 let _ = main_list.toggle_done(index.parse::<usize>().unwrap());
                 let ordered_list = main_list.formatted_ordered_items(0, false);
                 print!("\n\n{}\n", ordered_list);
             }
             PrioritizeActions::List { pred, incomplete } => {
+                #[cfg(debug_assertions)]
+                let start = Instant::now();
+
                 let pred = pred.unwrap_or(0u32);
                 let ordered_list = main_list.formatted_ordered_items(pred, *incomplete);
-                print!("\n\n{}\n", ordered_list);
+                println!("\n\n{}\n", ordered_list);
+
+                #[cfg(debug_assertions)]
+                println!("listing took {:?}", start.elapsed());
             }
 
             PrioritizeActions::Carry { pred } => {

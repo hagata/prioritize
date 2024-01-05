@@ -52,6 +52,29 @@ impl Log {
         Ok(())
     }
 
+    pub fn remove(&mut self, index: usize) -> Result<()> {
+        let today = Local::now().date_naive();
+
+        if let Some(list) = self.days.get_mut(&today) {
+            if let Some(&id) = list.order.get(index) {
+                if let Some(_task) = list.todos.get_mut(&id) {
+                    list.todos.remove(&id);
+                    list.order.retain(|t| t != &id);
+                    let json = serde_json::to_string_pretty(&self.days)?;
+                    fs::write("todos.json", json)?;
+                } else {
+                    println!("Unable to find task at index {index}");
+                }
+            } else {
+                println!("uuid not found")
+            }
+        } else {
+            println!("no entries for today")
+            // Handle the case where there is no entry for today's date
+        }
+        Ok(())
+    }
+
     pub fn toggle_done(&mut self, index: usize) -> Result<()> {
         let today = Local::now().date_naive();
 
