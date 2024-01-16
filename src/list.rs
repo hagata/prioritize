@@ -1,5 +1,5 @@
 use chrono::{Local, NaiveDate};
-use color_eyre::Result;
+use color_eyre::{eyre::Report, Result};
 
 use color_eyre::eyre::Ok;
 use serde::{Deserialize, Serialize};
@@ -132,6 +132,40 @@ impl Log {
         }
 
         ordered_list
+    }
+
+    pub fn push(&mut self, index: usize) -> Result<(), Report> {
+        let today = Local::now().date_naive();
+        let tomorrow = today.succ_opt().unwrap();
+
+        #[allow(unused_assignments)] // the else logic confuses the compiler
+        let mut task_to_move = None;
+
+        if let Some(list) = self.days.get_mut(&today) {
+            if let Some(&id) = list.order.get(index) {
+                if let Some(task) = list.todos.get(&id) {
+                    task_to_move = Some((id, task.clone()));
+                    //remove the task from today
+                    list.todos.remove(&id);
+                    list.order.retain(|&x| x != id);
+                } else {
+                    return Err(Report::msg("Task not Found"));
+                }
+            } else {
+                return Err(Report::msg("Invalid index, could not find task"));
+            }
+        } else {
+            return Err(Report::msg("No entries for today"));
+        }
+
+        if let Some((id, task)) = task_to_move {
+            let next_list = self.days.entry(tomorrow).or_insert_with(List::new);
+            next_list.todos.insert(id, task);
+            next_list.order.push(id);
+            let json = serde_json::to_string_pretty(&self.days)?;
+            fs::write("todos.json", json)?;
+        }
+        Ok(())
     }
 
     // move incomplete tasks from the prev_day to todays list.

@@ -79,6 +79,11 @@ enum PrioritizeActions {
         )]
         pred: Option<u32>,
     },
+    #[command(about = "Push a gien task to tomorrows list")]
+    Push {
+        #[arg(required = true)]
+        index: String,
+    },
 }
 
 fn main() -> Result<()> {
@@ -127,6 +132,17 @@ fn main() -> Result<()> {
 
                 #[cfg(debug_assertions)]
                 println!("listing took {:?}", start.elapsed());
+            }
+            PrioritizeActions::Push { index } => {
+                match main_list.push(index.parse::<usize>().unwrap()) {
+                    Ok(_) => {
+                        let ordered_list = main_list.formatted_ordered_items(0, false);
+                        print!("\n\n{}\n", ordered_list);
+                    }
+                    Err(err) => {
+                        println!("Error: {err}\n");
+                    }
+                }
             }
 
             PrioritizeActions::Carry { pred } => {
